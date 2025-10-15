@@ -1,336 +1,355 @@
-"""
-Simple Pygame action-avoid/shooter game implementing requested features.
-Save this file as game.py and run with Python 3.8+.
-Requires: pygame (pip install pygame)
-
-Features implemented:
-1. Welcome screen that waits for key press to begin.
-2. Player uses arrow keys to move; SPACE to shoot.
-3. Enemies (red) spawn at right and move left automatically. Collectibles (green) spawn
-   and give points when collected.
-4. Collisions: hitting enemy reduces lives; if lives <= 0 the game ends. Bullets destroy enemies.
-5. Score system: +10 for destroying enemy, +5 for collecting item, +1 for surviving time.
-6. Current score & lives rendered on-screen.
-7. End-game screen: shows final score and options to Play Again (R) or Quit (Q or ESC).
-8. Increasing difficulty: as time passes enemies spawn faster and move faster.
-9. FPS control via clock (default 60 FPS).
-10. Player displayed as a purple circle.
-11. Screen size configurable via SCREEN_WIDTH and SCREEN_HEIGHT variables.
-
-Feel free to modify values at the top to tweak difficulty and sizes.
-"""
+# game.py
+# Escape From Peru — runner estilo Dino con estética peruana
+# Contiene: animación de inicio y de muerte, obstáculos (flechas arriba; cactus/llamas suelo),
+# HUD con puntuación, dificultad creciente, jugador morado, tamaño fijo.
 
 import pygame
 import random
 import sys
 import math
-from dataclasses import dataclass
 
-# === Configuration ===
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+# ---------------------------
+# CONFIGURACIÓN GENERAL
+# ---------------------------
+WIDTH, HEIGHT = 900, 320
 FPS = 60
-PLAYER_SPEED = 5
-BULLET_SPEED = 10
-PLAYER_SIZE = 28  # radius for circle
-ENEMY_MIN_SPEED = 2
-ENEMY_MAX_SPEED = 5
-ENEMY_SPAWN_INTERVAL = 1500  # milliseconds (will decrease over time)
-ITEM_SPAWN_INTERVAL = 4000
-STARTING_LIVES = 3
-SCORE_PER_ENEMY = 10
-SCORE_PER_ITEM = 5
-SURVIVAL_SCORE_INTERVAL = 1000  # every second +1 score
+GROUND_Y = HEIGHT - 60
+GRAVITY = 0.8
 
-# Colors
+# Colores
+PURPLE = (148, 0, 211)           # jugador
+SAND = (235, 214, 164)
+SKY = (140, 205, 240)
+BROWN = (120, 72, 0)
+DARK_BROWN = (95, 60, 20)
+SUN = (252, 212, 64)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-PURPLE = (160, 32, 240)
-RED = (220, 20, 60)
-GREEN = (34, 177, 76)
-YELLOW = (255, 215, 0)
+GOLD = (218, 165, 32)
+GREEN = (34, 139, 34)
+RED = (200, 30, 30)
 
-# Pygame init
 pygame.init()
-font = pygame.font.SysFont(None, 28)
-big_font = pygame.font.SysFont(None, 64)
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Purple Runner: Avoid & Survive")
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Escape From Peru")
 clock = pygame.time.Clock()
+font_big = pygame.font.SysFont("arial", 42, bold=True)
+font = pygame.font.SysFont("arial", 22, bold=True)
 
-# Entities
-@dataclass
+# ---------------------------
+# UTILIDADES DE DIBUJO
+# ---------------------------
+def draw_background(scroll_x):
+    # Cielo
+    screen.fill(SKY)
+
+    # Sol (Inti) que vibra levemente
+    pygame.draw.circle(screen, SUN, (80, 80), 30)
+
+    # Montañas andinas (parallax)
+    for i in range(-1, 4):
+        base_x = i * 300 + (scroll_x * 0.2) % 300
+        pygame.draw.polygon(screen, (160, 180, 200), [
+            (base_x + 50, GROUND_Y), (base_x + 150, 140), (base_x + 250, GROUND_Y)
+        ])
+    for i in range(-1, 4):
+        base_x = i * 350 + (scroll_x * 0.5) % 350
+        pygame.draw.polygon(screen, (120, 150, 180), [
+            (base_x + 80, GROUND_Y), (base_x + 190, 120), (base_x + 300, GROUND_Y)
+        ])
+
+    # Suelo (Líneas de Nazca)
+    pygame.draw.rect(screen, SAND, (0, GROUND_Y, WIDTH, HEIGHT - GROUND_Y))
+    for i in range(0, WIDTH, 120):
+        pygame.draw.line(screen, (220, 200, 150), (i + (scroll_x % 120), GROUND_Y + 20),
+                         (i + 40 + (scroll_x % 120), GROUND_Y + 45), 2)
+
+def draw_peru_flag(x, y, w=48, h=30, t=0.0):
+    """Bandera de Perú con efecto de onda senoidal en el borde derecho."""
+    # Tres franjas: rojo, blanco, rojo
+    band_w = w // 3
+    # Ondita en el borde derecho
+    offset = int(3 * math.sin(t * 6 + x * 0.05))
+    pygame.draw.rect(screen, RED,   (x,         y, band_w, h))
+    pygame.draw.rect(screen, WHITE, (x+band_w,  y, band_w, h))
+    pygame.draw.rect(screen, RED,   (x+2*band_w, y, band_w, h+offset), border_radius=2)
+
+# ---------------------------
+# CLASES DE ENTIDADES
+# ---------------------------
 class Player:
-    x: float
-    y: float
-    speed: float
-    radius: int
-    lives: int
+    def __init__(self):
+        self.w = 36
+        self.h = 48
+        self.x = 80
+        self.y = GROUND_Y - self.h
+        self.vy = 0
+        self.on_ground = True
+        self.dead = False
+        self.rect = pygame.Rect(self.x, self.y, self.w, self.h)
 
-    def rect(self):
-        return pygame.Rect(self.x - self.radius, self.y - self.radius, self.radius*2, self.radius*2)
+    def jump(self):
+        if self.on_ground and not self.dead:
+            self.vy = -13
+            self.on_ground = False
 
-    def draw(self, surf):
-        pygame.draw.circle(surf, PURPLE, (int(self.x), int(self.y)), self.radius)
+    def duck(self, is_down):
+        if self.dead:
+            return
+        if is_down and self.on_ground:
+            self.h = 32
+        else:
+            self.h = 48
 
-@dataclass
-class Enemy:
-    x: float
-    y: float
-    vx: float
-    size: int
-
-    def rect(self):
-        return pygame.Rect(self.x, self.y, self.size, self.size)
-
-    def draw(self, surf):
-        pygame.draw.rect(surf, RED, self.rect())
-
-@dataclass
-class Bullet:
-    x: float
-    y: float
-    vx: float
-    vy: float
-    size: int = 6
-
-    def rect(self):
-        return pygame.Rect(self.x - self.size//2, self.y - self.size//2, self.size, self.size)
+    def update(self):
+        self.vy += GRAVITY
+        self.y += self.vy
+        if self.y >= GROUND_Y - self.h:
+            self.y = GROUND_Y - self.h
+            self.vy = 0
+            self.on_ground = True
+        self.rect = pygame.Rect(self.x, self.y, self.w, self.h)
 
     def draw(self, surf):
-        pygame.draw.rect(surf, YELLOW, self.rect())
+        # “Indio” morado con penacho
+        pygame.draw.rect(surf, PURPLE, self.rect, border_radius=6)
+        px = self.rect.x + self.w - 6
+        py = self.rect.y - 6
+        pygame.draw.polygon(surf, (200, 0, 0), [(px, py), (px + 8, py + 2), (px, py + 10)])
+        pygame.draw.polygon(surf, (0, 180, 0), [(px - 6, py + 4), (px + 2, py + 6), (px - 6, py + 14)])
+        pygame.draw.polygon(surf, (0, 120, 200), [(px - 12, py + 8), (px - 2, py + 10), (px - 12, py + 18)])
 
-@dataclass
-class Item:
-    x: float
-    y: float
-    size: int = 14
+class Obstacle:
+    # Tipos: 'llama' y 'cactus' (suelo), 'flecha' (aéreo)
+    def __init__(self, speed):
+        self.type = random.choice(["llama", "cactus", "cactus", "flecha"])
+        self.speed = speed
+        self.x = WIDTH + 20
 
-    def rect(self):
-        return pygame.Rect(self.x - self.size//2, self.y - self.size//2, self.size, self.size)
+        if self.type == "llama":
+            self.w, self.h = 36, 34
+            self.y = GROUND_Y - self.h
+        elif self.type == "cactus":
+            self.w, self.h = 22, random.choice([28, 40])
+            self.y = GROUND_Y - self.h
+        else:  # flecha en el aire
+            self.w, self.h = 40, 10
+            self.y = random.choice([GROUND_Y - 110, GROUND_Y - 85, GROUND_Y - 60])
+
+        self.rect = pygame.Rect(self.x, self.y, self.w, self.h)
+
+    def update(self, dt):
+        self.x -= self.speed * dt
+        self.rect.x = int(self.x)
 
     def draw(self, surf):
-        pygame.draw.rect(surf, GREEN, self.rect())
+        if self.type == "llama":
+            pygame.draw.rect(surf, DARK_BROWN, self.rect, border_radius=6)
+            pygame.draw.circle(surf, BROWN, (self.rect.centerx + 10, self.rect.y + 6), 6)
+        elif self.type == "cactus":
+            pygame.draw.rect(surf, GREEN, self.rect, border_radius=4)
+        else:  # flecha
+            # Vástago
+            pygame.draw.rect(surf, (90, 60, 40), self.rect, border_radius=3)
+            # Punta triangular
+            tip = (self.rect.right + 8, self.rect.centery)
+            tri = [(self.rect.right, self.rect.top-2),
+                   (self.rect.right, self.rect.bottom+2),
+                   tip]
+            pygame.draw.polygon(surf, (160, 160, 160), tri)
+            # Plumas
+            pygame.draw.line(surf, RED,   (self.rect.left-6, self.rect.top),    (self.rect.left, self.rect.top+2), 3)
+            pygame.draw.line(surf, WHITE, (self.rect.left-6, self.rect.bottom), (self.rect.left, self.rect.bottom-2), 3)
 
-# Helper collision test
-def collide_rect_circle(rect: pygame.Rect, cx: float, cy: float, radius: float) -> bool:
-    # find closest point
-    closest_x = max(rect.left, min(cx, rect.right))
-    closest_y = max(rect.top, min(cy, rect.bottom))
-    dx = closest_x - cx
-    dy = closest_y - cy
-    return dx*dx + dy*dy <= radius*radius
+class Coin:
+    def __init__(self, speed):
+        self.r = 8
+        self.x = WIDTH + 20
+        self.y = random.choice([GROUND_Y - 100, GROUND_Y - 70, GROUND_Y - 40])
+        self.speed = speed
+        self.rect = pygame.Rect(self.x - self.r, self.y - self.r, self.r*2, self.r*2)
 
-# Screens
+    def update(self, dt):
+        self.x -= self.speed * dt
+        self.rect.x = int(self.x - self.r)
 
-def draw_text_centered(surf, text, font_obj, color, y):
-    txt = font_obj.render(text, True, color)
-    r = txt.get_rect(center=(SCREEN_WIDTH//2, y))
-    surf.blit(txt, r)
+    def draw(self, surf):
+        pygame.draw.circle(surf, GOLD, (int(self.x), int(self.y)), self.r)
+        pygame.draw.circle(surf, BLACK, (int(self.x), int(self.y)), self.r, 2)
 
+# ---------------------------
+# PANTALLAS Y ANIMACIONES
+# ---------------------------
+def intro_animation():
+    t = 0.0
+    llama_x = -60
+    while t < 2.5:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT: pygame.quit(); sys.exit()
+            if e.type == pygame.KEYDOWN: return  # permitir saltar intro
 
-def welcome_screen():
-    screen.fill(BLACK)
-    draw_text_centered(screen, "WELCOME TO PURPLE RUNNER", big_font, PURPLE, SCREEN_HEIGHT//3)
-    draw_text_centered(screen, "Use arrow keys to move. SPACE to shoot.", font, WHITE, SCREEN_HEIGHT//2)
-    draw_text_centered(screen, "Avoid red enemies, collect green items. Press any key to start.", font, WHITE, SCREEN_HEIGHT//2 + 40)
-    draw_text_centered(screen, "Press ESC at any time to quit.", font, WHITE, SCREEN_HEIGHT//2 + 80)
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        dt = clock.tick(FPS) / 1000.0
+        t += dt
+        llama_x += 160 * dt
+
+        draw_background(scroll_x=t*120)
+        # banderas ondeando
+        for i in range(3):
+            draw_peru_flag(560 + i*60, 30 + 10*i, t=t)
+        # llama desfilando
+        rect_llama = pygame.Rect(int(llama_x), GROUND_Y-34, 36, 34)
+        pygame.draw.rect(screen, DARK_BROWN, rect_llama, border_radius=6)
+        pygame.draw.circle(screen, BROWN, (rect_llama.centerx + 10, rect_llama.y + 6), 6)
+
+        # título
+        title = font_big.render("Escape From Peru", True, BLACK)
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, 90))
+        tip = font.render("Pulsa cualquier tecla para empezar", True, BLACK)
+        screen.blit(tip, (WIDTH//2 - tip.get_width()//2, 150))
+        pygame.display.flip()
+
+def death_animation(player, scroll_x):
+    # El jugador tropieza y cae mientras se tiñe la pantalla de rojo
+    fall_vy = -6
+    alpha = 0
+    overlay = pygame.Surface((WIDTH, HEIGHT))
+    overlay.set_alpha(alpha)
+    overlay.fill((180, 0, 0))
+    t = 0.0
+    while t < 1.2:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT: pygame.quit(); sys.exit()
+
+        dt = clock.tick(FPS) / 1000.0
+        t += dt
+        fall_vy += GRAVITY * 1.5
+        player.y += fall_vy
+        if player.y > GROUND_Y - player.h: player.y = GROUND_Y - player.h
+        player.rect = pygame.Rect(player.x, player.y, player.w, player.h)
+
+        draw_background(scroll_x)
+        pygame.draw.line(screen, DARK_BROWN, (0, GROUND_Y), (WIDTH, GROUND_Y), 3)
+        player.draw(screen)
+
+        alpha = min(220, alpha + 8)
+        overlay.set_alpha(alpha)
+        screen.blit(overlay, (0, 0))
+        text = font.render("¡Ay, caramba!", True, WHITE)
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, 40))
+        pygame.display.flip()
+
+def end_screen(score, best):
+    while True:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit(); sys.exit()
-                waiting = False
-        clock.tick(15)
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_r: return "restart"
+                if e.key == pygame.K_ESCAPE: pygame.quit(); sys.exit()
+        screen.fill(SKY)
+        msg = font_big.render("Fin del juego", True, BLACK)
+        sc = font.render(f"Puntuación: {score}   Mejor: {best}", True, BLACK)
+        opt = font.render("Pulsa R para jugar de nuevo • ESC para salir", True, BLACK)
+        screen.blit(msg, (WIDTH//2 - msg.get_width()//2, 100))
+        screen.blit(sc, (WIDTH//2 - sc.get_width()//2, 150))
+        screen.blit(opt, (WIDTH//2 - opt.get_width()//2, 190))
+        pygame.display.flip()
+        clock.tick(FPS)
 
-
-def end_game_screen(score):
-    screen.fill(BLACK)
-    draw_text_centered(screen, "GAME OVER", big_font, RED, SCREEN_HEIGHT//3)
-    draw_text_centered(screen, f"Final Score: {score}", font, WHITE, SCREEN_HEIGHT//2)
-    draw_text_centered(screen, "Press R to play again or Q/ESC to quit.", font, WHITE, SCREEN_HEIGHT//2 + 40)
-    pygame.display.flip()
-    waiting = True
-    while waiting:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_q, pygame.K_ESCAPE):
-                    pygame.quit(); sys.exit()
-                elif event.key == pygame.K_r:
-                    waiting = False
-        clock.tick(15)
-
-# Main game loop
-
-def run_game():
-    # initialize game state
-    player = Player(SCREEN_WIDTH*0.1, SCREEN_HEIGHT//2, PLAYER_SPEED, PLAYER_SIZE, STARTING_LIVES)
-    enemies = []
-    bullets = []
-    items = []
-
+# ---------------------------
+# BUCLE PRINCIPAL DEL JUEGO
+# ---------------------------
+def game_loop():
+    player = Player()
+    obstacles = []
+    coins = []
     score = 0
-    last_enemy_spawn = pygame.time.get_ticks()
-    enemy_spawn_interval = ENEMY_SPAWN_INTERVAL
-    last_item_spawn = pygame.time.get_ticks()
-    last_survival_score = pygame.time.get_ticks()
-    start_time = pygame.time.get_ticks()
+    spawn_timer = 0
+    coin_timer = 0
+    scroll_x = 0
+    best = 0
+
+    base_speed = 280
+    speed = base_speed
+    time_alive = 0.0
 
     running = True
     while running:
-        dt = clock.tick(FPS)
-        now = pygame.time.get_ticks()
+        dt = clock.tick(FPS) / 1000.0
+        time_alive += dt
+        scroll_x += speed * dt
 
-        # Event handling
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        # Dificultad creciente
+        speed = base_speed + int(time_alive * 10)
+        spawn_interval = max(0.9, 1.8 - time_alive * 0.05)
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit(); sys.exit()
+            if e.type == pygame.KEYDOWN:
+                if e.key in (pygame.K_SPACE, pygame.K_UP): player.jump()
+                if e.key == pygame.K_ESCAPE: pygame.quit(); sys.exit()
 
-        # Input state
+        # Agacharse
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
-            player.y -= player.speed
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            player.y += player.speed
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            player.x -= player.speed
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            player.x += player.speed
-        if keys[pygame.K_SPACE]:
-            # simple rate limit: allow shot every 200ms
-            if not hasattr(player, 'last_shot') or now - player.last_shot > 200:
-                bullets.append(Bullet(player.x + player.radius + 5, player.y, BULLET_SPEED, 0))
-                player.last_shot = now
+        player.duck(keys[pygame.K_DOWN])
 
-        # Player bounds
-        player.x = max(player.radius, min(SCREEN_WIDTH - player.radius, player.x))
-        player.y = max(player.radius, min(SCREEN_HEIGHT - player.radius, player.y))
+        # Spawns
+        spawn_timer += dt
+        coin_timer += dt
+        if spawn_timer >= spawn_interval:
+            obstacles.append(Obstacle(speed))
+            spawn_timer = 0
+        if coin_timer >= random.uniform(1.8, 3.2):
+            coins.append(Coin(speed * 0.95))
+            coin_timer = 0
 
-        # Difficulty ramp: every 10 seconds, slightly increase enemy speed and spawn frequency
-        elapsed_seconds = (now - start_time) / 1000.0
-        difficulty_multiplier = 1.0 + (elapsed_seconds // 10) * 0.12  # +12% every 10s
-        enemy_spawn_interval = max(400, int(ENEMY_SPAWN_INTERVAL / difficulty_multiplier))
+        # Update
+        player.update()
+        for o in obstacles[:]:
+            o.update(dt)
+            if o.rect.right < 0:
+                obstacles.remove(o)
+                score += 5
+        for c in coins[:]:
+            c.update(dt)
+            if c.rect.right < 0:
+                coins.remove(c)
 
-        # Spawn enemies
-        if now - last_enemy_spawn > enemy_spawn_interval:
-            last_enemy_spawn = now
-            size = random.randint(20, 40)
-            y = random.randint(0, SCREEN_HEIGHT - size)
-            base_speed = random.uniform(ENEMY_MIN_SPEED, ENEMY_MAX_SPEED)
-            vx = -base_speed * difficulty_multiplier
-            enemies.append(Enemy(SCREEN_WIDTH + size, y, vx, size))
+        # Colisiones
+        for o in obstacles:
+            if player.rect.colliderect(o.rect):
+                player.dead = True
+                death_animation(player, scroll_x)  # ← animación de muerte
+                best = max(best, score)
+                return score, best
 
-        # Spawn items
-        if now - last_item_spawn > ITEM_SPAWN_INTERVAL:
-            last_item_spawn = now
-            y = random.randint(20, SCREEN_HEIGHT - 20)
-            items.append(Item(SCREEN_WIDTH + 20, y))
+        for c in coins[:]:
+            if player.rect.colliderect(c.rect):
+                score += 10
+                coins.remove(c)
 
-        # Update enemies
-        for e in enemies[:]:
-            e.x += e.vx
-            # remove off-screen
-            if e.x + e.size < 0:
-                enemies.remove(e)
-
-        # Update bullets
-        for b in bullets[:]:
-            b.x += b.vx
-            b.y += b.vy
-            if b.x > SCREEN_WIDTH + 50 or b.x < -50:
-                bullets.remove(b)
-
-        # Update items (move left slowly)
-        for it in items[:]:
-            it.x -= 2 * difficulty_multiplier
-            if it.x < -50:
-                items.remove(it)
-
-        # Bullet-enemy collisions
-        for b in bullets[:]:
-            for e in enemies[:]:
-                if b.rect().colliderect(e.rect()):
-                    try:
-                        bullets.remove(b)
-                    except ValueError:
-                        pass
-                    try:
-                        enemies.remove(e)
-                    except ValueError:
-                        pass
-                    score += SCORE_PER_ENEMY
-                    break
-
-        # Player-enemy collisions
-        for e in enemies[:]:
-            if collide_rect_circle(e.rect(), player.x, player.y, player.radius):
-                try:
-                    enemies.remove(e)
-                except ValueError:
-                    pass
-                player.lives -= 1
-                # brief flash or knockback could be added
-                if player.lives <= 0:
-                    return score
-
-        # Player-item collisions
-        for it in items[:]:
-            if collide_rect_circle(it.rect(), player.x, player.y, player.radius):
-                try:
-                    items.remove(it)
-                except ValueError:
-                    pass
-                score += SCORE_PER_ITEM
-
-        # Survival score
-        if now - last_survival_score > SURVIVAL_SCORE_INTERVAL:
-            last_survival_score = now
-            score += 1
-
-        # Draw
-        screen.fill((30, 30, 30))
-
-        # Draw player
+        # Dibujo
+        draw_background(scroll_x)
+        pygame.draw.line(screen, DARK_BROWN, (0, GROUND_Y), (WIDTH, GROUND_Y), 3)
+        for o in obstacles: o.draw(screen)
+        for c in coins: c.draw(screen)
         player.draw(screen)
 
-        # Draw enemies
-        for e in enemies:
-            e.draw(screen)
-
-        # Draw bullets
-        for b in bullets:
-            b.draw(screen)
-
-        # Draw items
-        for it in items:
-            it.draw(screen)
-
-        # UI: score & lives
-        score_surf = font.render(f"Score: {score}", True, WHITE)
-        lives_surf = font.render(f"Lives: {player.lives}", True, WHITE)
-        screen.blit(score_surf, (10, 10))
-        screen.blit(lives_surf, (10, 36))
-
-        # Difficulty indicator small bar
-        diff_text = font.render(f"Difficulty x{difficulty_multiplier:.2f}", True, WHITE)
-        screen.blit(diff_text, (SCREEN_WIDTH - 200, 10))
-
+        # HUD
+        hud = font.render(f"Score: {score}", True, BLACK)
+        screen.blit(hud, (WIDTH - 10 - hud.get_width(), 10))
         pygame.display.flip()
 
-    return score
-
-
-if __name__ == '__main__':
+def main():
+    intro_animation()             # ← animación peruana al inicio
+    best = 0
     while True:
-        welcome_screen()
-        final_score = run_game()
-        end_game_screen(final_score)
+        score, best_candidate = game_loop()
+        best = max(best, best_candidate, score)
+        action = end_screen(score, best)
+        if action == "restart":
+            continue
+
+if __name__ == "__main__":
+    main()
