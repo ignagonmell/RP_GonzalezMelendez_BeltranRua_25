@@ -1,0 +1,13 @@
+<launch>
+    <param name="change_player_color" type="int" value="2" />
+    <param name="screen_param" type="str" value="phase1" />
+
+    <node pkg="escape_peru_ros" type="game_node.py" name="game_node" output="screen"/>
+
+    <node pkg="escape_peru_ros" type="result_node.py" name="result_node" output="screen"/>
+
+    <node pkg="escape_peru_ros" type="control_node.py" name="control_node" output="screen"/>
+
+    <node pkg="escape_peru_ros" type="info_user.py" name="info_user" output="screen" launch-prefix="gnome-terminal --" />
+
+</launch>
