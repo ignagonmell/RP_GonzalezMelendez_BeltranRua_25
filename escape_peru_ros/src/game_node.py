@@ -8,12 +8,9 @@ import os
 from escape_peru_ros.msg import user_msg
 from std_msgs.msg import Int64, String
 
-<<<<<<< HEAD
 # --- IMPORTAMOS LOS SERVICIOS (PARTE 2) ---
 from escape_peru_ros.srv import GetUserScore, GetUserScoreResponse, SetGameDifficulty, SetGameDifficultyResponse
 
-=======
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
 # --- UTILIDADES ROS ---
 def get_asset_path(filename):
     base_dir = os.path.dirname(os.path.realpath(__file__))
@@ -25,11 +22,7 @@ FPS = 60
 GRAVITY = 0.8
 
 pygame.init()
-<<<<<<< HEAD
 # Ventana normal (no full screen) para ver otras terminales
-=======
-# CAMBIO IMPORTANTE: Quitamos FULLSCREEN para poder ver las dos ventanas
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
 screen = pygame.display.set_mode((1000, 360)) 
 pygame.display.set_caption("ESCAPE FROM PERU - ROS NODE")
 
@@ -43,7 +36,6 @@ font_big = pygame.font.SysFont("arial", int(42 * SCALE), bold=True)
 font = pygame.font.SysFont("arial", int(22 * SCALE), bold=True)
 font_mid = pygame.font.SysFont("georgia", int(50 * SCALE), bold=True)
 
-<<<<<<< HEAD
 # Colores definidos en el PDF [cite: 39-41]
 PURPLE = (148, 0, 211) # Color 2 (Default)
 RED = (200, 30, 30)    # Color 1
@@ -51,11 +43,6 @@ BLUE = (0, 0, 255)
 
 SAND = (235, 214, 164)
 DARK_BROWN = (95, 60, 20)# Color 3
-=======
-PURPLE = (148, 0, 211)
-SAND = (235, 214, 164)
-DARK_BROWN = (95, 60, 20)
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
 GOLD = (218, 165, 32)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -105,26 +92,17 @@ class Player:
         self.on_ground = True
         self.dead = False
         self.rect = pygame.Rect(self.x, self.y, self.w, self.h)
-<<<<<<< HEAD
 
-=======
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
     def jump(self):
         if self.on_ground and not self.dead:
             self.vy = -13 * SCALE
             self.on_ground = False
-<<<<<<< HEAD
 
-=======
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
     def duck(self, is_down):
         if self.dead: return
         if is_down and self.on_ground: self.h = int(32 * SCALE)
         else: self.h = int(48 * SCALE)
-<<<<<<< HEAD
 
-=======
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
     def update(self):
         self.vy += GRAVITY * SCALE
         self.y += self.vy
@@ -133,7 +111,6 @@ class Player:
             self.vy = 0
             self.on_ground = True
         self.rect = pygame.Rect(self.x, self.y, self.w, self.h)
-<<<<<<< HEAD
 
     def draw(self, surf):
         cx = self.rect.centerx
@@ -150,11 +127,6 @@ class Player:
         else:
             stick_color = PURPLE
 
-=======
-    def draw(self, surf):
-        cx = self.rect.centerx
-        stick_color = PURPLE
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         head_radius = int(self.h * 0.18)
         pygame.draw.circle(surf, stick_color, (cx, self.rect.y + head_radius + int(self.h * 0.05)), head_radius)
         body_top = self.rect.y + int(self.h * 0.3)
@@ -212,7 +184,6 @@ class Coin:
 class GameNode:
     def __init__(self):
         rospy.init_node('game_node', anonymous=True)
-<<<<<<< HEAD
         
         # --- PARAMS INICIALES ---
         rospy.set_param('/change_player_color', 2) # Default Morado
@@ -228,17 +199,10 @@ class GameNode:
         self.srv_diff = rospy.Service('difficulty', SetGameDifficulty, self.handle_set_difficulty)
 
         # Estado del juego
-=======
-        rospy.Subscriber('user_information', user_msg, self.user_callback)
-        rospy.Subscriber('keyboard_control', String, self.control_callback) # [cite: 99]
-        self.result_pub = rospy.Publisher('result_information', Int64, queue_size=10) # [cite: 108]
-
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         self.player_name = None
         self.username = None
         self.data_received = False
         self.ros_command = None 
-<<<<<<< HEAD
         self.last_score = 0
         
         # Dificultad
@@ -280,20 +244,13 @@ class GameNode:
         return SetGameDifficultyResponse(True)
 
     # --- CALLBACKS TOPICS ---
-=======
-        rospy.loginfo("GAME NODE STARTING...")
-
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
     def user_callback(self, msg):
         if not self.data_received:
             self.player_name = msg.name
             self.username = msg.username
             self.data_received = True
-<<<<<<< HEAD
             # PARAM: Guardar user_name [cite: 30]
             rospy.set_param('/user_name', self.username)
-=======
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             rospy.loginfo(f"Datos recibidos: {self.username}")
 
     def control_callback(self, msg):
@@ -310,38 +267,25 @@ class GameNode:
             clock.tick(10)
 
     def intro_animation(self):
-<<<<<<< HEAD
         # PARAM: Actualizar screen_param a phase1 [cite: 43]
         rospy.set_param('/screen_param', 'phase1')
         self.game_state_str = "phase1"
         rospy.loginfo("Phase 1: Welcome phase started.")
         
-=======
-        rospy.loginfo("Phase 1: Welcome phase started.")
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         while not rospy.is_shutdown():
             for e in pygame.event.get():
                 if e.type == pygame.QUIT: sys.exit()
             
-<<<<<<< HEAD
             start_game = False
             keys = pygame.key.get_pressed()
             if keys[pygame.K_SPACE]: start_game = True
             if self.ros_command == "SPACE": start_game = True
-=======
-            # --- START LOGIC (ROS + LOCAL) ---
-            start_game = False
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_SPACE]: start_game = True # Local
-            if self.ros_command == "SPACE": start_game = True # ROS 
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             
             if start_game:
                 self.ros_command = None
                 return
 
             screen.blit(START_BG, (0, 0))
-<<<<<<< HEAD
             
             # Mostrar nombre y dificultad actual
             if self.username:
@@ -350,12 +294,6 @@ class GameNode:
                 screen.blit(welcome_txt, (WIDTH//2 - welcome_txt.get_width()//2, HEIGHT * 0.3))
                 screen.blit(diff_txt, (10, 10))
 
-=======
-            if self.username:
-                welcome_txt = font_big.render(f"HOLA {self.username.upper()}!", True, GOLD)
-                screen.blit(welcome_txt, (WIDTH//2 - welcome_txt.get_width()//2, HEIGHT * 0.3))
-            
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             prompt = font.render("Pulsa ESPACIO en el MANDO para empezar", True, WHITE)
             screen.blit(prompt, (WIDTH//2 - prompt.get_width()//2, HEIGHT * 0.85))
             
@@ -363,54 +301,30 @@ class GameNode:
             clock.tick(FPS)
 
     def rules_screen(self):
-<<<<<<< HEAD
         for i in range(120):
-=======
-        for i in range(120): # 2 segundos
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             screen.blit(RULES_BG, (0,0))
             pygame.display.flip()
             clock.tick(60)
 
-<<<<<<< HEAD
     # --- PANTALLAS FINALES ---
     def final_screen_loop(self, bg_image, score, coins):
         # PARAM: Actualizar screen_param a phase3 [cite: 43]
         rospy.set_param('/screen_param', 'phase3')
         self.game_state_str = "phase3"
         
-=======
-    # --- PANTALLAS FINALES (Return 'restart' or 'exit') ---
-    def final_screen_loop(self, bg_image, score, coins):
-        """Bucle genérico para pantallas de Win/Lose esperando Reinicio"""
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         while not rospy.is_shutdown():
             for e in pygame.event.get():
                 if e.type == pygame.QUIT: sys.exit()
             
-<<<<<<< HEAD
             keys = pygame.key.get_pressed()
             if keys[pygame.K_r] or self.ros_command == "R":
                 self.ros_command = None
                 return "restart"
-=======
-            # --- INPUTS FINAL ---
-            keys = pygame.key.get_pressed()
-            # Reiniciar con R (Local o ROS)
-            if keys[pygame.K_r] or self.ros_command == "R":
-                self.ros_command = None
-                return "restart"
-            # Salir con ESC (Local o ROS)
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             if keys[pygame.K_ESCAPE] or self.ros_command == "ESC":
                 self.ros_command = None
                 return "exit"
 
             screen.blit(bg_image, (0,0))
-<<<<<<< HEAD
-=======
-            # HUD Final
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             if bg_image == GAMEOVER_BG or bg_image == WIN_BG:
                 txt = font_mid.render(f"SCORE: {score}", True, (200, 200, 200))
                 screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
@@ -421,10 +335,6 @@ class GameNode:
             clock.tick(30)
 
     def death_animation(self, player, scroll_x):
-<<<<<<< HEAD
-=======
-        # Animación breve antes de mostrar Game Over
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         for i in range(30):
             screen.blit(DEATH_BG, (0,0))
             pygame.display.flip()
@@ -432,62 +342,39 @@ class GameNode:
 
     # --- GAME LOOP ---
     def game_loop(self):
-<<<<<<< HEAD
         # PARAM: Actualizar screen_param a phase2 [cite: 43]
         rospy.set_param('/screen_param', 'phase2')
         self.game_state_str = "phase2"
         rospy.loginfo("Phase 2: Game phase started.")
         
-=======
-        rospy.loginfo("Phase 2: Game phase started.")
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         player = Player()
         obstacles, coins = [], []
         score, coin_count = 0, 0
         scroll_x, speed, time_alive = 0, 280, 0.0
         spawn_timer, coin_timer = 0, 0
 
-<<<<<<< HEAD
         # Aplicamos el multiplicador de dificultad
         current_base_speed = 280 * self.difficulty_mult
 
-=======
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
         while not rospy.is_shutdown():
             dt = clock.tick(FPS) / 1000.0
             time_alive += dt
             scroll_x += speed * dt * SCALE
-<<<<<<< HEAD
             speed = current_base_speed + int(time_alive * 10)
 
-=======
-            speed = 280 + int(time_alive * 10)
-
-            # --- INPUTS DE JUEGO ---
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             keys = pygame.key.get_pressed()
             jump_cmd = False
             duck_cmd = False
             
-<<<<<<< HEAD
             if self.ros_command == "UP": jump_cmd = True
             elif self.ros_command == "DOWN": duck_cmd = True
             elif self.ros_command == "ESC": return score, coin_count, False
 
-=======
-            # Input ROS
-            if self.ros_command == "UP": jump_cmd = True
-            elif self.ros_command == "DOWN": duck_cmd = True
-            elif self.ros_command == "ESC": return score, coin_count, False # Salida de emergencia
-
-            # Input Local (Backup)
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             for e in pygame.event.get():
                 if e.type == pygame.QUIT: sys.exit()
                 if e.type == pygame.KEYDOWN:
                     if e.key in (pygame.K_SPACE, pygame.K_UP): jump_cmd = True
 
-<<<<<<< HEAD
             if keys[pygame.K_DOWN]: duck_cmd = True
 
             if jump_cmd: player.jump()
@@ -500,18 +387,6 @@ class GameNode:
             spawn_limit = max(0.9, 1.8 - time_alive * 0.05) / self.difficulty_mult
             
             if spawn_timer >= spawn_limit:
-=======
-            if keys[pygame.K_DOWN]: duck_cmd = True # Local Duck
-
-            if jump_cmd: player.jump()
-            player.duck(duck_cmd)
-            self.ros_command = None # Limpiar comando tras procesar
-
-            # Lógica
-            spawn_timer += dt
-            coin_timer += dt
-            if spawn_timer >= max(0.9, 1.8 - time_alive * 0.05):
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
                 obstacles.append(Obstacle(speed))
                 spawn_timer = 0
             if coin_timer >= random.uniform(1.8, 3.2):
@@ -519,20 +394,12 @@ class GameNode:
                 coin_timer = 0
 
             player.update()
-<<<<<<< HEAD
-=======
-            # Colisiones
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             for o in obstacles[:]:
                 o.update(dt)
                 if o.rect.right < 0: obstacles.remove(o); score += 5
                 if player.rect.colliderect(o.rect):
                     rospy.loginfo("Final phase reached (Collision).")
-<<<<<<< HEAD
                     return score, coin_count, False 
-=======
-                    return score, coin_count, False # PERDIÓ
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             
             for c in coins[:]:
                 c.update(dt)
@@ -543,14 +410,8 @@ class GameNode:
                     coins.remove(c)
                     if coin_count >= 15:
                         rospy.loginfo("Final phase reached (Win).")
-<<<<<<< HEAD
                         return score, coin_count, True 
 
-=======
-                        return score, coin_count, True # GANÓ
-
-            # Dibujo
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             draw_background(scroll_x)
             for o in obstacles: o.draw(screen)
             for c in coins: c.draw(screen)
@@ -567,7 +428,6 @@ class GameNode:
             self.rules_screen()
             
             score, coins, won = self.game_loop()
-<<<<<<< HEAD
             self.last_score = score # Guardamos para el servicio GetUserScore
             
             score_msg = Int64()
@@ -575,17 +435,6 @@ class GameNode:
             self.result_pub.publish(score_msg) 
             rospy.loginfo(f"Puntuación publicada: {score}")
 
-=======
-            
-            # --- FASE 3: PUBLICAR RESULTADO ---
-            # Ahora esto SÍ se ejecutará porque el bucle termina bien
-            score_msg = Int64()
-            score_msg.data = score
-            self.result_pub.publish(score_msg) # [cite: 137]
-            rospy.loginfo(f"Puntuación publicada: {score}")
-
-            # Pantallas finales con opción a reiniciar
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
             if won:
                 action = self.final_screen_loop(WIN_BG, score, coins)
             else: 
@@ -593,11 +442,7 @@ class GameNode:
                 action = self.final_screen_loop(GAMEOVER_BG, score, coins)
             
             if action == "exit":
-<<<<<<< HEAD
                 break
-=======
-                break # Salir del bucle principal
->>>>>>> db63cb35758a047e80cec98011dc80cd91ba9115
 
 if __name__ == '__main__':
     try:
