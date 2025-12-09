@@ -94,7 +94,7 @@ Services Server:
 
 Parameters:
 
-Reads /change_player_color (Int): Changes character color (1=Red, 2=Purple, 3=Blue).
+Reads /change_player_color (Int): Changes character color (1=Red, 2=Purple, 3=Dark Brown).
 
 
 Writes /screen_param (String): Updates the current game phase (phase1, phase2, phase3).
